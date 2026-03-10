@@ -15,4 +15,5 @@ class UserInDatabase(SQLModel, table=True):
     currAccessToken: str = Field(min_length=1)
     currAccessTokenExpiry: datetime
 
+    gmailObserverExpiry: datetime
     gmailHistoryId: int | None = Field(default=None)

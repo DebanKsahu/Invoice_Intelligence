@@ -7,7 +7,7 @@ from internal.auth.models.AuthCredentials import AuthCredentials
 
 
 def createAuthRouter(applicationDependency: AppDependency) -> APIRouter:
-    authRouter = APIRouter(prefix="/auth")
+    authRouter = APIRouter(prefix="/auth", tags=["Authentication"])
 
     @authRouter.get("/gmail/initAuth")
     async def startAuth(request: Request) -> RedirectResponse:
