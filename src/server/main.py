@@ -17,12 +17,14 @@ async def appLifespan(app: FastAPI):
     yield
 
 
-settings = Settings()
-asyncEngine = createAsyncEngine(settings=settings)
-asyncSessionMaker = createAsyncSessionMaker(asyncEngine=asyncEngine)
-applicationDependency = AppDependency(
-    settings=settings, asyncEngine=asyncEngine, asyncSessionMaker=asyncSessionMaker
-)
+def buildAppDependencies():
+    settings = Settings()
+    asyncEngine = createAsyncEngine(settings=settings)
+    asyncSessionMaker = createAsyncSessionMaker(asyncEngine=asyncEngine)
+    applicationDependency = AppDependency(
+        settings=settings, asyncEngine=asyncEngine, asyncSessionMaker=asyncSessionMaker
+    )
+    return applicationDependency
 
 
 app = FastAPI(debug=True, version="0.1.0", title="Invoice Intelligence", lifespan=appLifespan)
@@ -36,6 +38,8 @@ app.add_middleware(
 )
 
 app.add_middleware(SessionMiddleware, secret_key="secret")
+
+applicationDependency = buildAppDependencies()
 
 app.include_router(createAuthRouter(applicationDependency=applicationDependency))
 app.include_router(createGmailRouter(applicationDependency=applicationDependency))
