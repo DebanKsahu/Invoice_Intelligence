@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_nested_delimiter=".",
         env_nested_max_split=3,
-        env_file=(BASE_DIR / ".env", "/etc/secrets/.env"),
+        env_file=BASE_DIR / ".env",
         env_file_encoding="utf-8",
     )
 
