@@ -1,6 +1,6 @@
 from google_auth_oauthlib.flow import Flow
 
-from internal.platform.authentication.scopes import GOOGLE_GMAIL_SCOPES
+from internal.platform.authentication.Scopes import GOOGLE_GMAIL_SCOPES
 from internal.platform.config.Settings import Settings
 
 
