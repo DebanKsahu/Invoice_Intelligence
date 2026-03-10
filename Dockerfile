@@ -22,21 +22,16 @@ RUN apt-get update && apt-get install -y \
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Copy dependency manifest (first for layer cache)
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml ./
 
 # Install Python deps via uv
-# --no-install-project: Install dependencies but not the project itself (allows caching)
-RUN uv sync --frozen --no-install-project --no-dev
+RUN uv sync
 
 # Copy project files
 COPY . .
 
-# Install the project itself now that source is available
-RUN uv sync --frozen --no-dev
+# Expose port (Render provides $PORT at runtime)
+EXPOSE 8000
 
-# Expose port (Render provides $PORT at runtime, defaults to 10000)
-EXPOSE 10000
-
-# Start server using sh to expand $PORT variable
-# 'uv run' ensures we run within the environment set up by 'uv sync'
-CMD ["sh", "-c", "uv run uvicorn server.main:app --host 0.0.0.0 --port ${PORT:-10000}"]
+# Start server using exec form (fixed port 8000). Note: exec form does not expand shell variables.
+CMD ln -sf /etc/secrets/.env /app/.env && uv run uvicorn src.server.main:app --host 0.0.0.0 --port 8000
