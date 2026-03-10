@@ -1,6 +1,6 @@
 import base64
 from datetime import datetime, timezone
-from typing import Dict
+from typing import Dict, List
 
 import msgspec
 from google.auth.external_account_authorized_user import Credentials
@@ -11,8 +11,13 @@ from googleapiclient.errors import HttpError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from internal.gmail import repository
+from internal.gmail.models.GmailAttachment import GmailAttachment
 from internal.gmail.models.GmailWebhookResponse import GmailWebhookResponse
 from internal.platform.config.Settings import Settings
+
+ALLOWED_INVOICE_MIME = {"application/pdf", "image/png", "image/jpeg", "image/jpg", "image/tiff", "image/webp"}
+
+ALLOWED_EXTENSIONS = (".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".webp")
 
 
 def createGmailObserver(userCredentails: Credentials | OAuthCredentils, settings: Settings):
@@ -28,7 +33,9 @@ def createGmailObserver(userCredentails: Credentials | OAuthCredentils, settings
     return response
 
 
-async def handleGmailWebhook(requestBody: Dict, asyncSession: AsyncSession, settings: Settings) -> GmailWebhookResponse:
+async def handleGmailWebhook(
+    requestBody: Dict, asyncSession: AsyncSession, settings: Settings
+) -> GmailWebhookResponse:
     message = requestBody.get("message", {})
     if "data" not in message:
         return GmailWebhookResponse(ok=False, reason="no data")
@@ -90,6 +97,8 @@ async def handleGmailWebhook(requestBody: Dict, asyncSession: AsyncSession, sett
                 messageDetail = (
                     gmailService.users().messages().get(userId="me", id=messageId, format="full").execute()
                 )
+
+                invoiceFiles = extractInvoiceFiles(gmailService=gmailService, messageDetail=messageDetail)
                 # Handle The Message Like Extracting The Invoice Details Etc
 
             newGmailObserverResponse = createGmailObserver(
@@ -119,3 +128,76 @@ def fullGmailSyncFallback(gmailService):
         gmailService.users().messages().list(userId="me", labelIds=["INBOX"], maxResults=200).execute()
     )
     return [message["id"] for message in gmailServiceResponse.get("messages", [])]
+
+
+def collectAttachments(payloadParts, attachmentsList: List[GmailAttachment]):
+    for part in payloadParts:
+        fileName = part.get("filename")
+        mimeType = part.get("mimeType")
+        body = part.get("body", {})
+
+        if fileName and "attachmentId" in body:
+            attachmentsList.append(
+                GmailAttachment(fileName=fileName, mimeType=mimeType, attachmentId=body["attachmentId"])
+            )
+
+        if "parts" in body:
+            collectAttachments(part["parts"], attachmentsList)
+
+
+def extractAttachmentFromMessage(messageDetail) -> List[GmailAttachment]:
+    attachments: list[GmailAttachment] = []
+
+    payload = messageDetail.get("payload", {})
+
+    if "parts" in payload:
+        collectAttachments(payload["parts"], attachments)
+
+    return attachments
+
+
+def filterInvoiceAttachments(attachmentsList: List[GmailAttachment]) -> List[GmailAttachment]:
+    finalAttachments = []
+    for attachment in attachmentsList:
+        if attachment.mimeType in ALLOWED_INVOICE_MIME:
+            finalAttachments.append(attachment)
+
+        elif attachment.fileName.lower().endswith(ALLOWED_EXTENSIONS):
+            finalAttachments.append(attachment)
+
+    return finalAttachments
+
+
+def downloadAttachment(gmailService, messageId, attachment: GmailAttachment) -> bytes:
+    response = (
+        gmailService.users()
+        .messages()
+        .attachments()
+        .get(userId="me", messageId=messageId, id=attachment.attachmentId)
+        .execute()
+    )
+
+    return base64.urlsafe_b64decode(response["data"])
+
+
+def extractInvoiceFiles(gmailService, messageDetail):
+    messageId = messageDetail["id"]
+
+    attachments = extractAttachmentFromMessage(messageDetail)
+
+    invoiceFiles = filterInvoiceAttachments(attachments)
+
+    files = []
+
+    for attachment in invoiceFiles:
+        file_bytes = downloadAttachment(gmailService, messageId, attachment)
+
+        files.append(
+            {
+                "filename": attachment.fileName,
+                "mime_type": attachment.mimeType,
+                "data": file_bytes,
+            }
+        )
+
+    return files
