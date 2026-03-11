@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from logging import Logger
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -15,6 +16,8 @@ class AppDependency:
     # Database Depedencies
     asyncEngine: AsyncEngine
     asyncSessionMaker: async_sessionmaker
+
+    logger: Logger
 
     @asynccontextmanager
     async def getAsyncSession(self) -> AsyncGenerator[AsyncSession, None]:

@@ -1,3 +1,4 @@
+from logging import Logger
 import base64
 from datetime import datetime, timezone
 from typing import Dict, List
@@ -34,9 +35,10 @@ def createGmailObserver(userCredentails: Credentials | OAuthCredentils, settings
 
 
 async def handleGmailWebhook(
-    requestBody: Dict, asyncSession: AsyncSession, settings: Settings
+    requestBody: Dict, asyncSession: AsyncSession, settings: Settings, logger: Logger
 ) -> GmailWebhookResponse:
     message = requestBody.get("message", {})
+    logger.info(f"Got the message from google {message}")
     if "data" not in message:
         return GmailWebhookResponse(ok=False, reason="no data")
     rawPayload = base64.b64decode(message["data"])

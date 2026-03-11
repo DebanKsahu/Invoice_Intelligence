@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -10,6 +12,8 @@ async def createNewUser(
     userInfo: GoogleUserInfo,
     userCredentials: AuthCredentials,
     asyncSession: AsyncSession,
+    gmailHistoryId: int | None = None,
+    gmailObserverExpiry: datetime | None = None,
 ):
     newUser = UserInDatabase(
         name=userInfo.name,
@@ -18,13 +22,21 @@ async def createNewUser(
         refreshToken=userCredentials.refreshToken,
         currAccessToken=userCredentials.accessToken,
         currAccessTokenExpiry=userCredentials.accessTokenExpiry,
+        gmailHistoryId=gmailHistoryId,
+        gmailObserverExpiry=gmailObserverExpiry,
     )
 
     asyncSession.add(newUser)
     await asyncSession.commit()
 
 
-async def updateUser(userInfo: GoogleUserInfo, userCredentials: AuthCredentials, asyncSession: AsyncSession):
+async def updateUser(
+    userInfo: GoogleUserInfo,
+    userCredentials: AuthCredentials,
+    asyncSession: AsyncSession,
+    gmailHistoryId: int | None = None,
+    gmailObserverExpiry: datetime | None = None,
+):
     existingUser = await getUserByGoogleSub(userGoogleSub=userInfo.googleSub, asyncSession=asyncSession)
     if existingUser is None:
         raise
@@ -35,6 +47,8 @@ async def updateUser(userInfo: GoogleUserInfo, userCredentials: AuthCredentials,
         existingUser.refreshToken = userCredentials.refreshToken
         existingUser.currAccessToken = userCredentials.accessToken
         existingUser.currAccessTokenExpiry = userCredentials.accessTokenExpiry
+        existingUser.gmailHistoryId = gmailHistoryId
+        existingUser.gmailObserverExpiry = gmailObserverExpiry
 
         asyncSession.add(existingUser)
         await asyncSession.commit()

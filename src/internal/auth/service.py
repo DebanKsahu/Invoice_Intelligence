@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import httpx
 import msgspec
 from fastapi import HTTPException
@@ -49,17 +51,29 @@ async def handleAuthCallback(
             userGoogleSub=userInfo.googleSub, asyncSession=asyncSession
         )
 
+        from internal.gmail.service import createGmailObserver
+
+        gmailObserberResponse = createGmailObserver(userCredentails=credentials, settings=settings)
+
         if existingUser is None:
             await repository.createNewUser(
                 userInfo=userInfo,
                 userCredentials=userCredentails,
                 asyncSession=asyncSession,
+                gmailHistoryId=gmailObserberResponse["historyId"],
+                gmailObserverExpiry=datetime.fromtimestamp(
+                    int(gmailObserberResponse["expiration"]) / 1000, tz=timezone.utc
+                ),
             )
         else:
             await repository.updateUser(
                 userInfo=userInfo,
                 userCredentials=userCredentails,
                 asyncSession=asyncSession,
+                gmailHistoryId=gmailObserberResponse["historyId"],
+                gmailObserverExpiry=datetime.fromtimestamp(
+                    int(gmailObserberResponse["expiration"]) / 1000, tz=timezone.utc
+                ),
             )
 
         return userCredentails

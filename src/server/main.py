@@ -1,3 +1,5 @@
+import logging
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -13,11 +15,18 @@ from internal.platform.database.PostgresSQLSetup import closePostgresSQL, create
 
 
 def buildAppDependencies():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        handlers=[logging.StreamHandler(sys.stdout)],
+    )
+
+    logger = logging.getLogger("FASTAPI BASE LOGGING")
     settings = Settings()
     asyncEngine = createAsyncEngine(settings=settings)
     asyncSessionMaker = createAsyncSessionMaker(asyncEngine=asyncEngine)
     applicationDependency = AppDependency(
-        settings=settings, asyncEngine=asyncEngine, asyncSessionMaker=asyncSessionMaker
+        settings=settings, asyncEngine=asyncEngine, asyncSessionMaker=asyncSessionMaker, logger=logger
     )
     return applicationDependency
 
