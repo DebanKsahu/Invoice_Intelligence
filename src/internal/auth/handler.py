@@ -1,3 +1,5 @@
+from logging import DEBUG, Logger
+
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 
@@ -22,6 +24,11 @@ def createAuthRouter(applicationDependency: AppDependency) -> APIRouter:
         originalState = request.session.pop("oauthState", "OriginalState")
         receivedCode = request.query_params.get("code", "receivedCode")
         originalCodeVerifier = request.session.pop("codeVerifier", None)
+        logger = Logger(name="TEST")
+        logger.setLevel(level=DEBUG)
+        logger.debug(
+            f"rState={receivedState},oState={originalState},rCode={receivedCode},oCV={originalCodeVerifier}"
+        )
 
         async with applicationDependency.getAsyncSession() as session:
             userCredentials = await service.handleAuthCallback(
