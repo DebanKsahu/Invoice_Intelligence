@@ -43,8 +43,4 @@ async def updateUser(userInfo: GoogleUserInfo, userCredentials: AuthCredentials,
 async def getUserByGoogleSub(userGoogleSub: str, asyncSession: AsyncSession):
     sqlStatement = select(UserInDatabase).where(UserInDatabase.googleSub == userGoogleSub)
     userDetail = (await asyncSession.execute(sqlStatement)).scalar_one_or_none()
-
-    if userDetail is None:
-        raise
-    else:
-        return userDetail
+    return userDetail
