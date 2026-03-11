@@ -4,7 +4,8 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from internal.platform.config.DatabaseSettings import DatabaseSettings
-from internal.platform.config.GoogleSettings import GoogleSettings
+from internal.platform.config.GoogleSettings import GoogleGeminiSettings, GoogleSettings
+from internal.platform.config.LlmWhispererSettings import LlmWhispererSettings
 
 BASE_DIR = Path(__file__).resolve().parents[4]
 
@@ -19,7 +20,5 @@ class Settings(BaseSettings):
 
     googleSettings: GoogleSettings = Field(alias="google_settings")
     databaseSettings: DatabaseSettings = Field(alias="database_settings")
-
-
-if __name__ == "__main__":
-    print(BASE_DIR / ".env")
+    llmWhispererSettings: LlmWhispererSettings = Field(alias="llmwhisperer_settings")
+    googleGeminiSettings: GoogleGeminiSettings = Field(alias="google_gemini_settings")

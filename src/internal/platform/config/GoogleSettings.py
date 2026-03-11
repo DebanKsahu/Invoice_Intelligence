@@ -11,3 +11,6 @@ class GoogleSettings(BaseModel):
 
     GMAIL_PUBSUB_TOPIC_NAME: str
     GMAIL_PUBSUB_CALLBACK_URL: str
+
+class GoogleGeminiSettings(BaseModel):
+    API_KEY: str
