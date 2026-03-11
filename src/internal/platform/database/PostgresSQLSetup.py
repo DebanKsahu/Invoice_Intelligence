@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlmodel import SQLModel
 
 from internal.platform.config.Settings import Settings
+from internal.platform.database.models.UserInDatabase import UserInDatabase
 
 
 def createAsyncEngine(settings: Settings):

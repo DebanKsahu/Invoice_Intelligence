@@ -9,12 +9,7 @@ from internal.auth.handler import createAuthRouter
 from internal.gmail.handler import createGmailRouter
 from internal.platform.config.Settings import Settings
 from internal.platform.database.Dependency import createAsyncSessionMaker
-from internal.platform.database.PostgresSQLSetup import createAsyncEngine
-
-
-@asynccontextmanager
-async def appLifespan(app: FastAPI):
-    yield
+from internal.platform.database.PostgresSQLSetup import closePostgresSQL, createAsyncEngine, initPostgresSQL
 
 
 def buildAppDependencies():
@@ -25,6 +20,16 @@ def buildAppDependencies():
         settings=settings, asyncEngine=asyncEngine, asyncSessionMaker=asyncSessionMaker
     )
     return applicationDependency
+
+
+applicationDependency = buildAppDependencies()
+
+
+@asynccontextmanager
+async def appLifespan(app: FastAPI):
+    await initPostgresSQL(asyncEngine=applicationDependency.asyncEngine)
+    yield
+    await closePostgresSQL(asyncEngine=applicationDependency.asyncEngine)
 
 
 app = FastAPI(debug=True, version="0.1.0", title="Invoice Intelligence", lifespan=appLifespan)
@@ -39,7 +44,6 @@ app.add_middleware(
 
 app.add_middleware(SessionMiddleware, secret_key="secret")
 
-applicationDependency = buildAppDependencies()
 
 app.include_router(createAuthRouter(applicationDependency=applicationDependency))
 app.include_router(createGmailRouter(applicationDependency=applicationDependency))
