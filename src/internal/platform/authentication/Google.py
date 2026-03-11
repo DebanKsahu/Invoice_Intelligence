@@ -25,7 +25,7 @@ def createAuthFlow(settings: Settings, originalState: str | None = None):
     else:
         return Flow.from_client_config(
             client_config=createClientConfig(settings=settings),
-            scopes=GOOGLE_GMAIL_SCOPES,
+            scopes=GOOGLE_GMAIL_SCOPES + GOOGLE_AUTH_SCOPES,
             redirect_uri=settings.googleSettings.AUTH_CALLBACK_URL,
             state=originalState,
         )

@@ -39,6 +39,7 @@ async def handleAuthCallback(
                 url="https://www.googleapis.com/oauth2/v3/userinfo",
                 headers={"Authorization": f"Bearer {credentials.token}"},
             )
+            response.raise_for_status()
             jsonResponse = msgspec.json.decode(response.content)
             userInfo = GoogleUserInfo(
                 googleSub=jsonResponse["sub"], name=jsonResponse["name"], email=jsonResponse["email"]
