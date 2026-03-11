@@ -11,8 +11,9 @@ def createAuthRouter(applicationDependency: AppDependency) -> APIRouter:
 
     @authRouter.get("/gmail/initAuth")
     async def startAuth(request: Request) -> RedirectResponse:
-        authUrl, state = service.handleStartAuth(settings=applicationDependency.settings)
+        authUrl, state, codeVerifier = service.handleStartAuth(settings=applicationDependency.settings)
         request.session["oauthState"] = state
+        request.session["codeVerifier"] = codeVerifier
         return RedirectResponse(authUrl)
 
     @authRouter.get("/gmail/callback")
@@ -20,6 +21,7 @@ def createAuthRouter(applicationDependency: AppDependency) -> APIRouter:
         receivedState = request.query_params.get("state", "receivedState")
         originalState = request.session.get("oauthState", "OriginalState")
         receivedCode = request.query_params.get("code", "receivedCode")
+        originalCodeVerifier = request.query_params.get("codeVerifier", None)
 
         async with applicationDependency.getAsyncSession() as session:
             userCredentials = await service.handleAuthCallback(
@@ -27,6 +29,7 @@ def createAuthRouter(applicationDependency: AppDependency) -> APIRouter:
                 receivedState=receivedState,
                 originalState=originalState,
                 receivedCode=receivedCode,
+                originalCodeVerifier=originalCodeVerifier,
                 asyncSession=session,
             )
 

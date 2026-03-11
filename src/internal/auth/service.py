@@ -13,15 +13,21 @@ from internal.platform.config.Settings import Settings
 def handleStartAuth(settings: Settings):
     flow = createAuthFlow(settings=settings)
     authUrl, state = flow.authorization_url(access_type="offline", prompt="consent")
-    return authUrl, state
+    return authUrl, state, flow.code_verifier
 
 
 async def handleAuthCallback(
-    settings: Settings, receivedState: str, originalState: str, receivedCode: str, asyncSession: AsyncSession
+    settings: Settings,
+    receivedState: str,
+    originalState: str,
+    receivedCode: str,
+    originalCodeVerifier: str | None,
+    asyncSession: AsyncSession,
 ):
     if receivedState != originalState:
         raise HTTPException(status_code=500)
     flow = createAuthFlow(settings=settings, originalState=originalState)
+    flow.code_verifier = originalCodeVerifier
     try:
         flow.fetch_token(code=receivedCode)
         credentials = flow.credentials
