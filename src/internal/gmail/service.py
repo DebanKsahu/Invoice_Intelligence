@@ -66,11 +66,11 @@ async def handleGmailWebhook(
         try:
             if user.gmailHistoryId is not None:
                 historyResponse = (
-                    gmailService.users().history().list(userId="me", startHistoryId=user.gmailHistoryId)
+                    gmailService.users().history().list(userId="me", startHistoryId=user.gmailHistoryId).execute()
                 )
             else:
                 historyResponse = (
-                    gmailService.users().history().list(userId="me", startHistoryId=newGmailHistoryId)
+                    gmailService.users().history().list(userId="me", startHistoryId=newGmailHistoryId).execute()
                 )
 
             messageIds = []
