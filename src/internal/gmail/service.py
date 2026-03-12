@@ -1,6 +1,10 @@
-from logging import Logger
 import base64
 from datetime import datetime, timezone
+from email import encoders
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from logging import Logger
 from typing import Dict, List
 
 import msgspec
@@ -13,7 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from internal.gmail import repository
 from internal.gmail.models.GmailAttachment import GmailAttachment
+from internal.gmail.models.GmailAttachmentDetail import GmailAttachmentDetail
+from internal.gmail.models.GmailMessage import GmailMessage
 from internal.gmail.models.GmailWebhookResponse import GmailWebhookResponse
+from internal.gmail.models.UserEmailDetail import UserEmailDetail
 from internal.platform.config.Settings import Settings
 
 ALLOWED_INVOICE_MIME = {"application/pdf", "image/png", "image/jpeg", "image/jpg", "image/tiff", "image/webp"}
@@ -66,11 +73,17 @@ async def handleGmailWebhook(
         try:
             if user.gmailHistoryId is not None:
                 historyResponse = (
-                    gmailService.users().history().list(userId="me", startHistoryId=user.gmailHistoryId).execute()
+                    gmailService.users()
+                    .history()
+                    .list(userId="me", startHistoryId=user.gmailHistoryId)
+                    .execute()
                 )
             else:
                 historyResponse = (
-                    gmailService.users().history().list(userId="me", startHistoryId=newGmailHistoryId).execute()
+                    gmailService.users()
+                    .history()
+                    .list(userId="me", startHistoryId=newGmailHistoryId)
+                    .execute()
                 )
 
             messageIds = []
@@ -203,3 +216,48 @@ def extractInvoiceFiles(gmailService, messageDetail):
         )
 
     return files
+
+
+def createGmailMessage(
+    userDetail: UserEmailDetail, subject: str, body: str, attachmentDetail: GmailAttachmentDetail | None
+):
+    if attachmentDetail is None:
+        message = MIMEText(body)
+        message["to"] = userDetail.email
+        message["subject"] = subject
+
+        raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+
+        return GmailMessage(raw=raw)
+    else:
+        message = MIMEMultipart()
+
+        message["to"] = userDetail.email
+        message["subject"] = subject
+
+        message.attach(MIMEText(body))
+
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(attachmentDetail.filebytes)
+
+        encoders.encode_base64(part)
+
+        part.add_header("Content-Disposition", f'attachment; filename="{attachmentDetail.filename}"')
+
+        message.attach(part)
+
+        raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        return GmailMessage(raw=raw)
+
+
+def sendEmail(
+    gmailService,
+    userDetail: UserEmailDetail,
+    subject: str,
+    body: str,
+    attachmentDetail: GmailAttachmentDetail | None,
+):
+    message = createGmailMessage(
+        userDetail=userDetail, subject=subject, body=body, attachmentDetail=attachmentDetail
+    )
+    gmailService.users().messages().send(userId="me", body=message.toDict()).execute()
