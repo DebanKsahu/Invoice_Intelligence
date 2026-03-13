@@ -1,27 +1,45 @@
-# Invoice Intelligence
+# 🧾 Invoice Intelligence
 
-Invoice Intelligence is a robust backend service tailored for intelligent invoice processing and management. Built with modern Python application standards, it leverages **FastAPI** for high-performance API delivery and integrates seamlessly with Google services for authentication and data retrieval.
+> **Intelligent Invoice Processing & Management Backend**
 
-The system features a modular architecture designed for scalability, utilising asynchronous database operations with **PostgreSQL** and Type-safe configuration management.
+![Python](https://img.shields.io/badge/Python-3.14+-blue.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-High%20Performance-009688.svg)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Async-336791.svg)
 
-## 🚀 Usage & Features
+---
 
-- **Google Authentication Integration**: Secure OAuth2 flow for **Gmail Read-Only** access (`https://www.googleapis.com/auth/gmail.readonly`), enabling automated invoice retrieval from emails.
-- **Gmail Webhook & Pub/Sub Integration**: Real-time notifications for new emails via Google Cloud Pub/Sub webhooks, ensuring immediate processing of invoices.
-- **Asynchronous Database**: High-performance async ORM using SQLAlchemy and SQLModel with PostgreSQL.
-- **Automatic Schema Management**: Database tables are automatically initialized on startup using SQLModel.
-- **Dependency Injection**: Centralized application state and dependency management via `AppDependency`.
-- **Structured Logging & Configuration**: Environment-based settings management using Pydantic.
-- **Middleware Support**: Integrated CORS and Session middleware for secure and flexible API interactions.
+**Invoice Intelligence** is a high-performance, asynchronous backend service designed to automate invoice retrieval and processing. Built with **FastAPI** and **modern Python**, it integrates seamlessly with the **Google Gmail API** for retrieval and leverages **AI (LLMWhisperer & Gemini)** for intelligent data extraction.
 
-## 🛠 Tech Stack
+This system is engineered for scalability, featuring a modular **Domain-Driven Design (DDD)** architecture, type-safe configuration, and robust PostgreSQL integration.
 
-- **Language**: Python 3.14+
-- **Framework**: [FastAPI](https://fastapi.tiangolo.com/)
-- **Database**: PostgreSQL (Async via `psycopg`, `SQLAlchemy`, & `SQLModel`)
-- **Authentication**: Google OAuth2 (`google-auth`, `google-auth-oauthlib`)
-- **Validation**: Pydantic & Msgspec
-- **Utilities**: `uuid7` for time-sorted unique identifiers
+## 🚀 Features
+
+| Feature | Description |
+| :--- | :--- |
+| **🔐 Secure Auth** | OAuth2 integration with **Google** for secure Gmail access (`gmail.readonly`). |
+| **📧 Real-time Sync** | **Pub/Sub Webhooks** ensure instant notification and processing of new invoice emails. |
+| **🧠 AI Extraction** | Powered by **LLMWhisperer** & **Google Gemini** to accurately parse invoices from PDFs & Images. |
+| **⚡ Async Performance** | Fully asynchronous **SQLAlchemy 2.0** & **SQLModel** ORM with PostgreSQL. |
+| **🏗️ Modular Design** | Clean **Domain-Driven Design (DDD)** architecture for maintainability and scale. |
+| **⚙️ Robust Config** | Type-safe environment management via **Pydantic Settings**. |
+| **🛡️ Middleware** | Production-ready **CORS** and **Session** management. |
+
+## 🛠️ Technology Stack
+
+**Core Infrastructure**
+- **Language:** [Python 3.14+](https://www.python.org/)
+- **Framework:** [FastAPI](https://fastapi.tiangolo.com/)
+- **Database:** PostgreSQL (Async via `psycopg` & `SQLModel`)
+- **Package Manager:** [uv](https://github.com/astral-sh/uv)
+
+**AI & Processing**
+- **LLM/AI:** [LangChain](https://www.langchain.com/), [Google Gemini](https://deepmind.google/technologies/gemini/), [LLMWhisperer](https://unstract.com/llmwhisperer/)
+- **PDF/Image:** `pymupdf`, `pdf2image`
+
+**Integrations & Tooling**
+- **Auth:** Google OAuth2 (`google-auth`)
+- **Validation:** Pydantic, Msgspec
+- **Utilities:** `uuid7` (Time-sorted UIDs)
 
 ## 📂 Project Structure
 
@@ -33,6 +51,7 @@ src/
 ├── internal/       # Internal domain modules (Business Logic)
 │   ├── auth/       # Authentication domain (Routes, Services, Models)
 │   ├── gmail/      # Gmail integration (Webhooks, Services, Models)
+│   ├── invoice/    # Invoice processing (PDF extraction, AI analysis)
 │   ├── platform/   # Infrastructure & Platform concerns (DB, Config, Google API)
 │   └── user/       # User domain logic
 ├── pkg/            # Shared packages and middlewares
@@ -49,19 +68,20 @@ src/
 
 ### Installation
 
-1.  **Clone the repository**
+### 📥 Installation
+
+1.  **Clone the Repository**
     ```bash
     git clone <repository-url>
     cd Invoice_Intelligence
     ```
 
 2.  **Install Dependencies**
-    This project uses [uv](https://github.com/astral-sh/uv) for dependency management.
-
+    Initialize the environment and sync dependencies using `uv`:
     ```bash
     uv sync
     ```
-    This command will create a virtual environment and install all dependencies as defined in `pyproject.toml`.
+    > This creates a virtual environment and installs all packages defined in `pyproject.toml`.
 
 3.  **Environment Configuration**
     Create a `.env` file in the root directory (based on `src/internal/platform/config/Settings.py`). The configuration uses nested delimiters (`.`).
@@ -78,17 +98,23 @@ src/
     google_settings.AUTH_CALLBACK_URL=http://localhost:8000/auth/gmail/callback
     google_settings.GMAIL_PUBSUB_TOPIC_NAME=projects/your-project/topics/gmail-updates
     google_settings.GMAIL_PUBSUB_CALLBACK_URL=https://your-domain.com/gmail/webhook
+
+    # AI & LLM Settings
+    llmwhisperer_settings.API_KEY=your_llm_whisperer_api_key
+    llmwhisperer_settings.BASE_URL=https://llmwhisperer-api.unstract.com/v2
+    google_gemini_settings.API_KEY=your_google_gemini_api_key
     ```
 
-### Running the Server
-You can run the server using `uv run` to execute commands within the project's environment:
+### ▶️ Running the Server
+
+Run the application within the project's environment:
 
 ```bash
-# Run from the root directory, pointing to the app instance in server/main.py
+# Development Mode (Hot Reload)
 uv run fastapi dev src/server/main.py
-# OR
-uv run # OR
-uvicorn src.server.main:app --reload
+
+# Production Mode
+uv run uvicorn src.server.main:app --host 0.0.0.0 --port 8000
 ```
 
 The API will be available at `http://localhost:8000`.
@@ -96,9 +122,22 @@ Explore the interactive API docs at `http://localhost:8000/docs`.
 
 ## 🔌 API Endpoints
 
-### Authentication
-- `GET /auth/gmail/initAuth`: Initiates the Google OAuth2 flow.
-- `GET /auth/gmail/callback`: Handles the redirect from Google and exchanges code for tokens.
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/auth/gmail/initAuth` | Initiates the Google OAuth2 flow for Gmail access. |
+| `GET` | `/auth/gmail/callback` | OAuth2 callback handler to exchange code for tokens. |
+| `POST` | `/gmail/webhook` | Receives Pub/Sub push notifications for mailbox updates. |
 
-### Gmail
-- `POST /gmail/webhook`: Receives push notifications from Google Cloud Pub/Sub containing mailbox updates.
+## 🤝 Contributing
+
+Contributions are welcome!
+
+1.  **Fork** the repository.
+2.  Create a feature branch: `git checkout -b feature/amazing-feature`
+3.  **Commit** your changes: `git commit -m 'Add amazing feature'`
+4.  **Push** to the branch: `git push origin feature/amazing-feature`
+5.  Open a **Pull Request**.
+
+---
+
+_Built with ❤️ using [FastAPI](https://fastapi.tiangolo.com/) and [Python](https://www.python.org/)._
