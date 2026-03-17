@@ -1,7 +1,7 @@
 import asyncio
 import base64
 from pathlib import Path
-from typing import Dict
+from typing import IO, Dict, List
 
 import aiofiles
 import fitz
@@ -13,6 +13,8 @@ from pymupdf import Document
 from unstract.llmwhisperer import LLMWhispererClientV2
 
 from core.Enums import DirectoryPaths
+from internal.invoice.models.InvoiceDetail import InvoiceDetail
+from internal.invoice.models.InvoiceValidation import InvoiceValidation
 from internal.invoice.models.PdfDetail import PdfDetail
 from internal.invoice.models.PdfPageDetail import PdfPageDetail
 from internal.invoice.models.PdfPageSummary import PdfPageSummary
@@ -21,20 +23,26 @@ from internal.platform.prompts.ImageSummarizePrompt import (
     imageSummarizeDetailOutputInstruction,
     imageSummarizeTaskInstruction,
 )
+from internal.platform.prompts.InvoiceDataExtractionPrompt import (
+    invoiceDataExtractionDetailOutputInstruction,
+    invoiceDataExtractionTaskInstruction,
+)
+from internal.platform.prompts.InvoiceValidationPrompt import (
+    invoiceValidationOutputInstruction,
+    invoiceValidationTaskInstruction,
+)
 
 
-def createLlmWhispererClient(settings: Settings):
+def createLlmWhispererClient(settings: Settings) -> LLMWhispererClientV2:
     llmWhispererClient = LLMWhispererClientV2(
         base_url=settings.llmWhispererSettings.BASE_URL, api_key=settings.llmWhispererSettings.API_KEY
     )
     return llmWhispererClient
 
 
-async def extractTextFromPdf(filePath: Path, settings: Settings):
+async def extractTextFromPdf(fileStream: IO[bytes], settings: Settings) -> List[str]:
     llmWhispererClient = createLlmWhispererClient(settings=settings)
-    response = llmWhispererClient.whisper(
-        file_path=str(filePath), mode="native_text", page_seperator="<<-->>"
-    )
+    response = llmWhispererClient.whisper(stream=fileStream, mode="native_text", page_seperator="<<-->>")
     responseWhisperHash: str = response.get("whisper_hash")
 
     result: Dict | None = None
@@ -52,12 +60,12 @@ async def extractTextFromPdf(filePath: Path, settings: Settings):
     return extractedTextArr
 
 
-async def constructPdfDetail(filePath: Path, settings: Settings):
-    docName = filePath.stem
-    doc = fitz.open(filePath)
+async def constructPdfDetail(fileName: str, fileStream: IO[bytes], settings: Settings) -> PdfDetail:
+    docName = fileName
+    doc = fitz.open(stream=fileStream)
     allPageDetails = []
 
-    extractedTextArr = await extractTextFromPdf(filePath=filePath, settings=settings)
+    extractedTextArr = await extractTextFromPdf(fileStream=fileStream, settings=settings)
 
     currPageNum = 1
     for page in doc:
@@ -99,26 +107,26 @@ def convertPageToImage(doc: Document, pageNumber: int, docName: str):
     return finalImagePath
 
 
-async def encodeImage(imagePath: Path):
+async def encodeImage(imagePath: Path) -> str:
     async with aiofiles.open(imagePath, "rb") as imageFile:
         image = await imageFile.read()
     return base64.b64encode(image).decode()
 
 
-def buildHumanMessageTextPart(inputText: str):
+def buildHumanMessageTextPart(inputText: str) -> Dict[str, str]:
     return {"type": "text", "text": inputText}
 
 
-def buildHumanMessageImagePart(encodedImage: str):
+def buildHumanMessageImagePart(encodedImage: str) -> Dict[str, str]:
     return {"type": "image_url", "image_url": f"data:image/png;base64,{encodedImage}"}
 
 
-def constructHumanMessage(*messageParts):
+def constructHumanMessage(*messageParts) -> HumanMessage:
     message = HumanMessage(content=list(messageParts))
     return message
 
 
-def createGoogleGeminiLLM(settings: Settings):
+def createGoogleGeminiLLM(settings: Settings) -> ChatGoogleGenerativeAI:
     googleGeminiLLM = ChatGoogleGenerativeAI(
         model="gemini-3-flash-preview", api_key=settings.googleGeminiSettings.API_KEY
     )
@@ -129,7 +137,7 @@ def createStructuredLLM(llm: ChatGoogleGenerativeAI, schema: type[BaseModel]):
     return llm.with_structured_output(schema=schema)
 
 
-async def generateSummary(imagePath: Path, settings: Settings):
+async def generateSummary(imagePath: Path, settings: Settings) -> PdfPageSummary:
     googleGeminiLLM = createGoogleGeminiLLM(settings=settings)
     googleGeminiStructuredLLM = createStructuredLLM(llm=googleGeminiLLM, schema=PdfPageSummary)
 
@@ -142,13 +150,48 @@ async def generateSummary(imagePath: Path, settings: Settings):
     )
 
     llmResponse = await googleGeminiStructuredLLM.ainvoke([message])
-
-    return validateLLMResponse(llmResponse=llmResponse)
-
-
-def validateLLMResponse(llmResponse: BaseModel | Dict):
     try:
         finalResponse = PdfPageSummary.model_validate(llmResponse, extra="ignore")
         return finalResponse
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to validate PDF page summary response")
+
+
+async def validateInvoice(pdfDetail: PdfDetail, settings: Settings) -> InvoiceValidation:
+    fullPdfText = ("\n\n").join([pageDetail.pageContext for pageDetail in pdfDetail.pageDetails])
+
+    googleGeminiLLM = createGoogleGeminiLLM(settings=settings)
+    googleGeminiStructuredLLM = createStructuredLLM(llm=googleGeminiLLM, schema=InvoiceValidation)
+
+    message = constructHumanMessage(
+        buildHumanMessageTextPart(inputText=invoiceValidationTaskInstruction),
+        buildHumanMessageTextPart(inputText=f"[INVOICE TEXT HERE] \n\n {fullPdfText}"),
+        buildHumanMessageTextPart(inputText=invoiceValidationOutputInstruction),
+    )
+
+    llmResponse = await googleGeminiStructuredLLM.ainvoke([message])
+    try:
+        finalResponse = InvoiceValidation.model_validate(llmResponse, extra="ignore")
+        return finalResponse
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to validate invoice")
+
+
+async def extractDetailFromInvoice(pdfDetail: PdfDetail, settings: Settings):
+    fullPdfText = ("\n\n").join([pageDetail.pageContext for pageDetail in pdfDetail.pageDetails])
+
+    googleGeminiLLM = createGoogleGeminiLLM(settings=settings)
+    googleGeminiStructuredLLM = createStructuredLLM(llm=googleGeminiLLM, schema=InvoiceDetail)
+
+    message = constructHumanMessage(
+        buildHumanMessageTextPart(inputText=invoiceDataExtractionTaskInstruction),
+        buildHumanMessageTextPart(inputText=f"[INVOICE TEXT HERE] \n\n {fullPdfText}"),
+        buildHumanMessageTextPart(inputText=invoiceDataExtractionDetailOutputInstruction),
+    )
+
+    llmResponse = await googleGeminiStructuredLLM.ainvoke([message])
+    try:
+        finalResponse = InvoiceDetail.model_validate(llmResponse, extra="ignore")
+        return finalResponse
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to extract fields from invoice")
