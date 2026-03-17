@@ -4,6 +4,7 @@ from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from io import BytesIO
 from logging import Logger
 from typing import Dict, List
 
@@ -21,6 +22,7 @@ from internal.gmail.models.GmailAttachmentDetail import GmailAttachmentDetail
 from internal.gmail.models.GmailMessage import GmailMessage
 from internal.gmail.models.GmailWebhookResponse import GmailWebhookResponse
 from internal.gmail.models.UserEmailDetail import UserEmailDetail
+from internal.invoice.service import constructPdfDetail, extractDetailFromInvoice, validateInvoice
 from internal.platform.config.Settings import Settings
 
 ALLOWED_INVOICE_MIME = {"application/pdf", "image/png", "image/jpeg", "image/jpg", "image/tiff", "image/webp"}
@@ -98,6 +100,27 @@ async def handleGmailWebhook(
                 messageDetail = (
                     gmailService.users().messages().get(userId="me", id=messageId, format="full").execute()
                 )
+                invoiceFiles = extractInvoiceFiles(gmailService=gmailService, messageDetail=messageDetail)
+                for invoiceFile in invoiceFiles:
+                    fileName = invoiceFile.get("fileName", None)
+                    fileBytes = invoiceFile.get("data", None)
+                    if isinstance(fileName, str) and isinstance(fileBytes, bytes):
+                        fileStream = BytesIO(fileBytes)
+                        pdfDetail = await constructPdfDetail(
+                            fileName=fileName, fileStream=fileStream, settings=settings
+                        )
+                        isInvoiceDetail = await validateInvoice(pdfDetail=pdfDetail, settings=settings)
+                        if isInvoiceDetail.isInvoice:
+                            invoiceDetail = await extractDetailFromInvoice(
+                                pdfDetail=pdfDetail, settings=settings
+                            )
+                            userEmailDetail = UserEmailDetail(name=user.name, email=user.email)
+                            sendEmail(
+                                gmailService=gmailService,
+                                userEmailDetail=userEmailDetail,
+                                subject="Testing 1",
+                                body=str(invoiceDetail),
+                            )
                 # Handle The Message Like Extracting The Invoice Details Etc
             newGmailHistoryId = max(
                 newGmailHistoryId, int(historyResponse.get("historyId", newGmailHistoryId))
@@ -114,6 +137,26 @@ async def handleGmailWebhook(
                 )
 
                 invoiceFiles = extractInvoiceFiles(gmailService=gmailService, messageDetail=messageDetail)
+                for invoiceFile in invoiceFiles:
+                    fileName = invoiceFile.get("fileName", None)
+                    fileBytes = invoiceFile.get("data", None)
+                    if isinstance(fileName, str) and isinstance(fileBytes, bytes):
+                        fileStream = BytesIO(fileBytes)
+                        pdfDetail = await constructPdfDetail(
+                            fileName=fileName, fileStream=fileStream, settings=settings
+                        )
+                        isInvoiceDetail = await validateInvoice(pdfDetail=pdfDetail, settings=settings)
+                        if isInvoiceDetail.isInvoice:
+                            invoiceDetail = await extractDetailFromInvoice(
+                                pdfDetail=pdfDetail, settings=settings
+                            )
+                            userEmailDetail = UserEmailDetail(name=user.name, email=user.email)
+                            sendEmail(
+                                gmailService=gmailService,
+                                userEmailDetail=userEmailDetail,
+                                subject="Testing 1",
+                                body=str(invoiceDetail),
+                            )
                 # Handle The Message Like Extracting The Invoice Details Etc
 
             newGmailObserverResponse = createGmailObserver(
@@ -209,7 +252,7 @@ def extractInvoiceFiles(gmailService, messageDetail):
 
         files.append(
             {
-                "filename": attachment.fileName,
+                "fileName": attachment.fileName,
                 "mime_type": attachment.mimeType,
                 "data": file_bytes,
             }
@@ -219,11 +262,11 @@ def extractInvoiceFiles(gmailService, messageDetail):
 
 
 def createGmailMessage(
-    userDetail: UserEmailDetail, subject: str, body: str, attachmentDetail: GmailAttachmentDetail | None
+    userEmailDetail: UserEmailDetail, subject: str, body: str, attachmentDetail: GmailAttachmentDetail | None
 ):
     if attachmentDetail is None:
         message = MIMEText(body)
-        message["to"] = userDetail.email
+        message["to"] = userEmailDetail.email
         message["subject"] = subject
 
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
@@ -232,7 +275,7 @@ def createGmailMessage(
     else:
         message = MIMEMultipart()
 
-        message["to"] = userDetail.email
+        message["to"] = userEmailDetail.email
         message["subject"] = subject
 
         message.attach(MIMEText(body))
@@ -252,12 +295,12 @@ def createGmailMessage(
 
 def sendEmail(
     gmailService,
-    userDetail: UserEmailDetail,
+    userEmailDetail: UserEmailDetail,
     subject: str,
     body: str,
-    attachmentDetail: GmailAttachmentDetail | None,
+    attachmentDetail: GmailAttachmentDetail | None = None,
 ):
     message = createGmailMessage(
-        userDetail=userDetail, subject=subject, body=body, attachmentDetail=attachmentDetail
+        userEmailDetail=userEmailDetail, subject=subject, body=body, attachmentDetail=attachmentDetail
     )
     gmailService.users().messages().send(userId="me", body=message.toDict()).execute()
