@@ -118,7 +118,7 @@ async def handleGmailWebhook(
                             sendEmail(
                                 gmailService=gmailService,
                                 userEmailDetail=userEmailDetail,
-                                subject="Testing 1",
+                                subject="Invoice Intelligence: Reply",
                                 body=str(invoiceDetail),
                             )
                 # Handle The Message Like Extracting The Invoice Details Etc
@@ -207,6 +207,12 @@ def extractAttachmentFromMessage(messageDetail) -> List[GmailAttachment]:
     attachments: list[GmailAttachment] = []
 
     payload = messageDetail.get("payload", {})
+    headers = payload.get("headers", [])
+
+    for header in headers:
+        if header.get("name", "").lower() == "subject":
+            if header.get("value", "") == "Invoice Intelligence: Reply":
+                return attachments
 
     if "parts" in payload:
         collectAttachments(payload["parts"], attachments)
