@@ -18,7 +18,7 @@ This system is engineered for scalability, featuring a modular **Domain-Driven D
 | :--- | :--- |
 | **🔐 Secure Auth** | OAuth2 integration with **Google** for secure Gmail access (`gmail.readonly`). |
 | **📧 Real-time Sync** | **Pub/Sub Webhooks** ensure instant notification and processing of new invoice emails. |
-| **🧠 AI Extraction** | Powered by **LLMWhisperer** & **Google Gemini** to accurately parse invoices from PDFs & Images. |
+| **🧠 Advanced AI Pipeline** | **Multi-stage processing**: <br>1. **Extraction**: High-fidelity text extraction using **LLMWhisperer**. <br>2. **Validation**: Intelligent document classification to filter non-invoices. <br>3. **Extraction**: Structured data parsing (Vendor, Line Items, Tax) using **Google Gemini**. |
 | **⚡ Async Performance** | Fully asynchronous **SQLAlchemy 2.0** & **SQLModel** ORM with PostgreSQL. |
 | **🏗️ Modular Design** | Clean **Domain-Driven Design (DDD)** architecture for maintainability and scale. |
 | **⚙️ Robust Config** | Type-safe environment management via **Pydantic Settings**. |
@@ -34,7 +34,7 @@ This system is engineered for scalability, featuring a modular **Domain-Driven D
 
 **AI & Processing**
 - **LLM/AI:** [LangChain](https://www.langchain.com/), [Google Gemini](https://deepmind.google/technologies/gemini/), [LLMWhisperer](https://unstract.com/llmwhisperer/)
-- **PDF/Image:** `pymupdf`, `pdf2image`
+- **PDF/Image:** `pymupdf` (FitZ), `pdf2image` for robust document handling.
 
 **Integrations & Tooling**
 - **Auth:** Google OAuth2 (`google-auth`)
