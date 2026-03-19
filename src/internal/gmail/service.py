@@ -55,6 +55,7 @@ async def handleGmailWebhook(
 
     userEmail = payload["emailAddress"]
     newGmailHistoryId = int(payload["historyId"])
+    logger.info(f"Got the new message historyId:{newGmailHistoryId}")
 
     user = await repository.getUserByEmail(userEmail=userEmail, asyncSession=asyncSession)
 
