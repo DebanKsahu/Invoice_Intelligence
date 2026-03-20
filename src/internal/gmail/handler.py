@@ -16,7 +16,6 @@ def createGmailRouter(applicationDependency: AppDependency) -> APIRouter:
                 requestBody=requestBody,
                 asyncSession=asyncSession,
                 settings=applicationDependency.settings,
-                logger=applicationDependency.logger,
             )
         return response
 

@@ -1,11 +1,11 @@
 import base64
+import logging
 from datetime import datetime, timezone
 from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from io import BytesIO
-from logging import Logger
 from typing import Dict, List
 
 import msgspec
@@ -44,8 +44,9 @@ def createGmailObserver(userCredentails: Credentials | OAuthCredentils, settings
 
 
 async def handleGmailWebhook(
-    requestBody: Dict, asyncSession: AsyncSession, settings: Settings, logger: Logger
+    requestBody: Dict, asyncSession: AsyncSession, settings: Settings
 ) -> GmailWebhookResponse:
+    logger = logging.getLogger(__name__)
     message = requestBody.get("message", {})
     logger.info("Processing Gmail webhook message")
 
