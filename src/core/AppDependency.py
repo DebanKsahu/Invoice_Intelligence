@@ -17,8 +17,6 @@ class AppDependency:
     asyncEngine: AsyncEngine
     asyncSessionMaker: async_sessionmaker
 
-    logger: Logger
-
     @asynccontextmanager
     async def getAsyncSession(self) -> AsyncGenerator[AsyncSession, None]:
         async with self.asyncSessionMaker() as session:

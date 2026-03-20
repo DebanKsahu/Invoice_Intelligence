@@ -1,5 +1,4 @@
 import logging
-import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -7,6 +6,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from core.AppDependency import AppDependency
+from core.LoggingConfig import setupLogging
 from internal.auth.handler import createAuthRouter
 from internal.gmail.handler import createGmailRouter
 from internal.platform.config.Settings import Settings
@@ -15,19 +15,16 @@ from internal.platform.database.PostgresSQLSetup import closePostgresSQL, create
 
 
 def buildAppDependencies():
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler(sys.stdout)],
-    )
+    logger = setupLogging()
 
-    logger = logging.getLogger("FASTAPI BASE LOGGING")
+    logger.info("Initializing Invoice Intelligence application...")
     settings = Settings()
     asyncEngine = createAsyncEngine(settings=settings)
     asyncSessionMaker = createAsyncSessionMaker(asyncEngine=asyncEngine)
     applicationDependency = AppDependency(
-        settings=settings, asyncEngine=asyncEngine, asyncSessionMaker=asyncSessionMaker, logger=logger
+        settings=settings, asyncEngine=asyncEngine, asyncSessionMaker=asyncSessionMaker
     )
+    logger.debug("Application dependencies initialized successfully")
     return applicationDependency
 
 
@@ -36,9 +33,14 @@ applicationDependency = buildAppDependencies()
 
 @asynccontextmanager
 async def appLifespan(app: FastAPI):
+    logger = logging.getLogger("invoice_intelligence")
+    logger.info("🚀 Application startup: Initializing database...")
     await initPostgresSQL(asyncEngine=applicationDependency.asyncEngine)
+    logger.info("✅ Database initialization completed")
     yield
+    logger.info("🛑 Application shutdown: Closing database connection...")
     await closePostgresSQL(asyncEngine=applicationDependency.asyncEngine)
+    logger.info("✅ Application shutdown completed")
 
 
 app = FastAPI(debug=True, version="0.1.0", title="Invoice Intelligence", lifespan=appLifespan)
