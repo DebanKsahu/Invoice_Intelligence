@@ -95,6 +95,12 @@ async def handleGmailWebhook(
                     messageId = message["message"]["id"]
                     messageIds.append(messageId)
 
+            if user.gmailHistoryId is not None and newGmailHistoryId <= user.gmailHistoryId:
+                logger.info(
+                    f"Skipping old Pub/Sub event. incoming={newGmailHistoryId}, stored={user.gmailHistoryId}"
+                )
+                return GmailWebhookResponse(ok=True)
+
             if len(messageIds) == 0:
                 messageIds = fullGmailUnreadFallback(gmailService=gmailService)
             for messageId in messageIds:
