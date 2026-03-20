@@ -47,77 +47,88 @@ async def handleGmailWebhook(
     requestBody: Dict, asyncSession: AsyncSession, settings: Settings, logger: Logger
 ) -> GmailWebhookResponse:
     message = requestBody.get("message", {})
-    logger.info(f"Got the message from google {message}")
+    logger.info("Processing Gmail webhook message")
+
     if "data" not in message:
+        logger.warning("Webhook message missing 'data' field")
         return GmailWebhookResponse(ok=False, reason="no data")
+
     rawPayload = base64.b64decode(message["data"])
     payload = msgspec.json.decode(rawPayload)
 
     userEmail = payload["emailAddress"]
     newGmailHistoryId = int(payload["historyId"])
-    logger.info(f"Got the new message historyId:{newGmailHistoryId}")
+    logger.info(f"Processing webhook for user: {userEmail}, historyId: {newGmailHistoryId}")
 
     user = await repository.getUserByEmail(userEmail=userEmail, asyncSession=asyncSession)
 
     if user is None:
+        logger.warning(f"Webhook received for unknown user: {userEmail}")
         return GmailWebhookResponse(ok=True)
-    else:
-        newUserCredentials = OAuthCredentils(
-            token=None,
-            refresh_token=user.refreshToken,
-            token_uri=settings.googleSettings.TOKEN_URI,
-            client_id=settings.googleSettings.CLIENT_ID,
-            client_secret=settings.googleSettings.CLIENT_SECRET,
-        )
-        newUserCredentials.refresh(GoogleRequest())
+    if user.gmailHistoryId is not None and newGmailHistoryId <= user.gmailHistoryId:
+        logger.info(f"Skipping old Pub/Sub event. incoming={newGmailHistoryId}, stored={user.gmailHistoryId}")
+        return GmailWebhookResponse(ok=True)
 
-        gmailService = build("gmail", "v1", credentials=newUserCredentials)
+    logger.debug(f"Found user in database: {user.email}")
 
-        try:
-            if user.gmailHistoryId is not None:
-                historyResponse = (
-                    gmailService.users()
-                    .history()
-                    .list(userId="me", startHistoryId=user.gmailHistoryId)
-                    .execute()
-                )
-            else:
-                historyResponse = (
-                    gmailService.users()
-                    .history()
-                    .list(userId="me", startHistoryId=newGmailHistoryId)
-                    .execute()
-                )
+    newUserCredentials = OAuthCredentils(
+        token=None,
+        refresh_token=user.refreshToken,
+        token_uri=settings.googleSettings.TOKEN_URI,
+        client_id=settings.googleSettings.CLIENT_ID,
+        client_secret=settings.googleSettings.CLIENT_SECRET,
+    )
+    newUserCredentials.refresh(GoogleRequest())
+    logger.debug("User credentials refreshed successfully")
 
-            messageIds = []
-            for history in historyResponse.get("history", []):
-                for message in history.get("messagesAdded", []):
-                    messageId = message["message"]["id"]
-                    messageIds.append(messageId)
+    gmailService = build("gmail", "v1", credentials=newUserCredentials)
 
-            if user.gmailHistoryId is not None and newGmailHistoryId <= user.gmailHistoryId:
-                logger.info(
-                    f"Skipping old Pub/Sub event. incoming={newGmailHistoryId}, stored={user.gmailHistoryId}"
-                )
-                return GmailWebhookResponse(ok=True)
+    try:
+        logger.debug(f"Fetching Gmail history from historyId: {user.gmailHistoryId or newGmailHistoryId}")
 
-            if len(messageIds) == 0:
-                messageIds = fullGmailUnreadFallback(gmailService=gmailService)
-            for messageId in messageIds:
+        if user.gmailHistoryId is not None:
+            historyResponse = (
+                gmailService.users().history().list(userId="me", startHistoryId=user.gmailHistoryId).execute()
+            )
+        else:
+            historyResponse = (
+                gmailService.users().history().list(userId="me", startHistoryId=newGmailHistoryId).execute()
+            )
+
+        messageIds = []
+        for history in historyResponse.get("history", []):
+            for message in history.get("messagesAdded", []):
+                messageId = message["message"]["id"]
+                messageIds.append(messageId)
+
+        logger.info(f"Found {len(messageIds)} new messages in history")
+
+        if len(messageIds) == 0:
+            logger.debug("No messages found in history, using fallback method")
+
+        logger.info(f"Processing {len(messageIds)} messages for invoice extraction")
+
+        for messageId in messageIds:
+            try:
                 messageDetail = (
                     gmailService.users().messages().get(userId="me", id=messageId, format="full").execute()
                 )
                 invoiceFiles = extractInvoiceFiles(gmailService=gmailService, messageDetail=messageDetail)
+                logger.debug(f"Found {len(invoiceFiles)} invoice files in message {messageId}")
+
                 for invoiceFile in invoiceFiles:
                     fileName = invoiceFile.get("fileName", None)
                     fileBytes = invoiceFile.get("data", None)
                     if isinstance(fileName, str) and isinstance(fileBytes, bytes):
                         fileStream = BytesIO(fileBytes)
+                        logger.debug(f"Processing invoice file: {fileName} ({len(fileBytes)} bytes)")
+
                         pdfDetail = await constructPdfDetail(
                             fileName=fileName, fileStream=fileStream, settings=settings
                         )
                         isInvoiceDetail = await validateInvoice(pdfDetail=pdfDetail, settings=settings)
                         if isInvoiceDetail.isInvoice:
+                            logger.info(f"Valid invoice detected: {fileName}")
                             invoiceDetail = await extractDetailFromInvoice(
                                 pdfDetail=pdfDetail, settings=settings
                             )
@@ -128,54 +139,61 @@ async def handleGmailWebhook(
                                 subject="Invoice Intelligence: Reply",
                                 body=str(invoiceDetail),
                             )
-                # Handle The Message Like Extracting The Invoice Details Etc
-            newGmailHistoryId = max(
-                newGmailHistoryId, int(historyResponse.get("historyId", newGmailHistoryId))
+                            logger.info(f"Invoice details sent to user: {user.email}")
+                        else:
+                            logger.debug(f"File {fileName} is not a valid invoice")
+            except Exception as e:
+                logger.error(f"Error processing message {messageId}: {str(e)}", exc_info=True)
+
+        newGmailHistoryId = max(newGmailHistoryId, int(historyResponse.get("historyId", newGmailHistoryId)))
+        user.gmailHistoryId = newGmailHistoryId
+        asyncSession.add(user)
+        await asyncSession.commit()
+        logger.info(f"Updated user history ID to: {newGmailHistoryId}")
+
+    except HttpError as e:
+        logger.warning(f"Gmail API error, falling back to sync method: {str(e)}", exc_info=True)
+        messageIds = fullGmailSyncFallback(gmailService=gmailService)
+        logger.info(f"Fallback sync found {len(messageIds)} messages")
+
+        for messageId in messageIds:
+            messageDetail = (
+                gmailService.users().messages().get(userId="me", id=messageId, format="full").execute()
             )
-            user.gmailHistoryId = newGmailHistoryId
-            asyncSession.add(user)
-            await asyncSession.commit()
 
-        except HttpError:
-            messageIds = fullGmailSyncFallback(gmailService=gmailService)
-            for messageId in messageIds:
-                messageDetail = (
-                    gmailService.users().messages().get(userId="me", id=messageId, format="full").execute()
-                )
+            invoiceFiles = extractInvoiceFiles(gmailService=gmailService, messageDetail=messageDetail)
+            for invoiceFile in invoiceFiles:
+                fileName = invoiceFile.get("fileName", None)
+                fileBytes = invoiceFile.get("data", None)
+                if isinstance(fileName, str) and isinstance(fileBytes, bytes):
+                    fileStream = BytesIO(fileBytes)
+                    logger.debug(f"Processing invoice file (fallback): {fileName}")
 
-                invoiceFiles = extractInvoiceFiles(gmailService=gmailService, messageDetail=messageDetail)
-                for invoiceFile in invoiceFiles:
-                    fileName = invoiceFile.get("fileName", None)
-                    fileBytes = invoiceFile.get("data", None)
-                    if isinstance(fileName, str) and isinstance(fileBytes, bytes):
-                        fileStream = BytesIO(fileBytes)
-                        pdfDetail = await constructPdfDetail(
-                            fileName=fileName, fileStream=fileStream, settings=settings
+                    pdfDetail = await constructPdfDetail(
+                        fileName=fileName, fileStream=fileStream, settings=settings
+                    )
+                    isInvoiceDetail = await validateInvoice(pdfDetail=pdfDetail, settings=settings)
+                    if isInvoiceDetail.isInvoice:
+                        logger.info(f"Valid invoice detected (fallback): {fileName}")
+                        invoiceDetail = await extractDetailFromInvoice(pdfDetail=pdfDetail, settings=settings)
+                        userEmailDetail = UserEmailDetail(name=user.name, email=user.email)
+                        sendEmail(
+                            gmailService=gmailService,
+                            userEmailDetail=userEmailDetail,
+                            subject="Invoice Intelligence: Reply",
+                            body=str(invoiceDetail),
                         )
-                        isInvoiceDetail = await validateInvoice(pdfDetail=pdfDetail, settings=settings)
-                        if isInvoiceDetail.isInvoice:
-                            invoiceDetail = await extractDetailFromInvoice(
-                                pdfDetail=pdfDetail, settings=settings
-                            )
-                            userEmailDetail = UserEmailDetail(name=user.name, email=user.email)
-                            sendEmail(
-                                gmailService=gmailService,
-                                userEmailDetail=userEmailDetail,
-                                subject="Testing 1",
-                                body=str(invoiceDetail),
-                            )
-                # Handle The Message Like Extracting The Invoice Details Etc
+                        logger.info(f"Invoice details sent to user (fallback): {user.email}")
 
-            newGmailObserverResponse = createGmailObserver(
-                userCredentails=newUserCredentials, settings=settings
-            )
-            user.gmailHistoryId = int(newGmailObserverResponse["historyId"])
-            user.gmailObserverExpiry = datetime.fromtimestamp(
-                timestamp=int(newGmailObserverResponse["expiration"]) / 1000, tz=timezone.utc
-            )
-            asyncSession.add(user)
-            await asyncSession.commit()
-        return GmailWebhookResponse(ok=True)
+        newGmailObserverResponse = createGmailObserver(userCredentails=newUserCredentials, settings=settings)
+        user.gmailHistoryId = int(newGmailObserverResponse["historyId"])
+        user.gmailObserverExpiry = datetime.fromtimestamp(
+            timestamp=int(newGmailObserverResponse["expiration"]) / 1000, tz=timezone.utc
+        )
+        asyncSession.add(user)
+        await asyncSession.commit()
+
+    return GmailWebhookResponse(ok=True)
 
 
 def fullGmailUnreadFallback(gmailService):

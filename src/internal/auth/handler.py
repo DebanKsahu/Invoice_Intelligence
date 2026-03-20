@@ -1,4 +1,4 @@
-from logging import DEBUG, Logger
+import logging
 
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
@@ -13,25 +13,26 @@ def createAuthRouter(applicationDependency: AppDependency) -> APIRouter:
 
     @authRouter.get("/gmail/initAuth")
     async def startAuth(request: Request) -> RedirectResponse:
+        logger = logging.getLogger(__name__)
+        logger.info("Starting Gmail OAuth authentication flow")
         authUrl, state, codeVerifier = service.handleStartAuth(settings=applicationDependency.settings)
         request.session["oauthState"] = state
         request.session["codeVerifier"] = codeVerifier
+        logger.debug(f"OAuth state generated: {state[:20]}...")
         return RedirectResponse(authUrl)
 
     @authRouter.get("/gmail/callback")
     async def authCallback(request: Request) -> AuthCredentials:
+        logger = logging.getLogger(__name__)
         receivedState = request.query_params.get("state", "receivedState")
         originalState = request.session.pop("oauthState", "OriginalState")
         receivedCode = request.query_params.get("code", "receivedCode")
         originalCodeVerifier = request.session.pop("codeVerifier", None)
-        logger = Logger(name="TEST")
-        logger.setLevel(level=DEBUG)
-        logger.debug(
-            f"rState={receivedState},oState={originalState},rCode={receivedCode},oCV={originalCodeVerifier}"
-        )
+
+        logger.info("Processing OAuth callback")
 
         async with applicationDependency.getAsyncSession() as session:
-            userCredentials = await service.handleAuthCallback(
+            userAuthCredentials = await service.handleAuthCallback(
                 settings=applicationDependency.settings,
                 receivedState=receivedState,
                 originalState=originalState,
@@ -40,6 +41,7 @@ def createAuthRouter(applicationDependency: AppDependency) -> APIRouter:
                 asyncSession=session,
             )
 
-        return userCredentials
+        logger.info("OAuth callback successfull processed")
+        return userAuthCredentials
 
     return authRouter
