@@ -5,10 +5,11 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- None.
+- Added Excel sheet generation for invoice output.
 
 ### Changed
-- None.
+- Updated project version to `0.3.0`.
+- Expanded changelog tracking with initial changelog creation and v0.2.0 release notes.
 
 ### Fixed
 - None.
