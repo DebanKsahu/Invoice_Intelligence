@@ -23,6 +23,7 @@ from internal.gmail.models.GmailMessage import GmailMessage
 from internal.gmail.models.GmailWebhookResponse import GmailWebhookResponse
 from internal.gmail.models.UserEmailDetail import UserEmailDetail
 from internal.invoice.service import constructPdfDetail, extractDetailFromInvoice, validateInvoice
+from internal.invoice.services.InvoiceDataFormatService import createInvoiceExcelSheet
 from internal.platform.config.Settings import Settings
 
 ALLOWED_INVOICE_MIME = {"application/pdf", "image/png", "image/jpeg", "image/jpg", "image/tiff", "image/webp"}
@@ -109,6 +110,8 @@ async def handleGmailWebhook(
 
         logger.info(f"Processing {len(messageIds)} messages for invoice extraction")
 
+        userEmailDetail = UserEmailDetail(name=user.name, email=user.email)
+
         for messageId in messageIds:
             try:
                 messageDetail = (
@@ -116,6 +119,8 @@ async def handleGmailWebhook(
                 )
                 invoiceFiles = extractInvoiceFiles(gmailService=gmailService, messageDetail=messageDetail)
                 logger.debug(f"Found {len(invoiceFiles)} invoice files in message {messageId}")
+
+                invoiceDetailList = []
 
                 for invoiceFile in invoiceFiles:
                     fileName = invoiceFile.get("fileName", None)
@@ -133,16 +138,21 @@ async def handleGmailWebhook(
                             invoiceDetail = await extractDetailFromInvoice(
                                 pdfDetail=pdfDetail, settings=settings
                             )
-                            userEmailDetail = UserEmailDetail(name=user.name, email=user.email)
-                            sendEmail(
-                                gmailService=gmailService,
-                                userEmailDetail=userEmailDetail,
-                                subject="Invoice Intelligence: Reply",
-                                body=str(invoiceDetail),
-                            )
-                            logger.info(f"Invoice details sent to user: {user.email}")
+                            invoiceDetailList.append(invoiceDetail)
                         else:
                             logger.debug(f"File {fileName} is not a valid invoice")
+                sendEmail(
+                    gmailService=gmailService,
+                    userEmailDetail=userEmailDetail,
+                    subject="Invoice Intelligence: Reply",
+                    body="Your Invoice Excel Sheet",
+                    attachmentDetail=GmailAttachmentDetail(
+                        filename="Invoices",
+                        filebytes=createInvoiceExcelSheet(invoiceDetails=invoiceDetailList),
+                    ),
+                )
+                logger.info(f"Invoice details sent to user: {user.email}")
+
             except Exception as e:
                 logger.error(f"Error processing message {messageId}: {str(e)}", exc_info=True)
 
@@ -157,12 +167,16 @@ async def handleGmailWebhook(
         messageIds = fullGmailSyncFallback(gmailService=gmailService)
         logger.info(f"Fallback sync found {len(messageIds)} messages")
 
+        userEmailDetail = UserEmailDetail(name=user.name, email=user.email)
+
         for messageId in messageIds:
             messageDetail = (
                 gmailService.users().messages().get(userId="me", id=messageId, format="full").execute()
             )
 
             invoiceFiles = extractInvoiceFiles(gmailService=gmailService, messageDetail=messageDetail)
+            invoiceDetailList = []
+
             for invoiceFile in invoiceFiles:
                 fileName = invoiceFile.get("fileName", None)
                 fileBytes = invoiceFile.get("data", None)
@@ -177,14 +191,18 @@ async def handleGmailWebhook(
                     if isInvoiceDetail.isInvoice:
                         logger.info(f"Valid invoice detected (fallback): {fileName}")
                         invoiceDetail = await extractDetailFromInvoice(pdfDetail=pdfDetail, settings=settings)
-                        userEmailDetail = UserEmailDetail(name=user.name, email=user.email)
-                        sendEmail(
-                            gmailService=gmailService,
-                            userEmailDetail=userEmailDetail,
-                            subject="Invoice Intelligence: Reply",
-                            body=str(invoiceDetail),
-                        )
-                        logger.info(f"Invoice details sent to user (fallback): {user.email}")
+                        invoiceDetailList.append(invoiceDetail)
+
+            sendEmail(
+                gmailService=gmailService,
+                userEmailDetail=userEmailDetail,
+                subject="Invoice Intelligence: Reply",
+                body="Your Invoice Excel Sheet",
+                attachmentDetail=GmailAttachmentDetail(
+                    filename="Invoices", filebytes=createInvoiceExcelSheet(invoiceDetails=invoiceDetailList)
+                ),
+            )
+            logger.info(f"Invoice details sent to user (fallback): {user.email}")
 
         newGmailObserverResponse = createGmailObserver(userCredentails=newUserCredentials, settings=settings)
         user.gmailHistoryId = int(newGmailObserverResponse["historyId"])
