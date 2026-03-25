@@ -79,6 +79,7 @@ async def handleGmailWebhook(
     gmailService = build("gmail", "v1", credentials=newUserCredentials)
 
     newGmailObserverResponse = createGmailObserver(userCredentails=newUserCredentials, settings=settings)
+    oldGmailHistoryId = user.gmailHistoryId if user.gmailHistoryId is not None else newGmailHistoryId
     user.gmailHistoryId = newGmailHistoryId
     user.gmailObserverExpiry = datetime.fromtimestamp(
         timestamp=int(newGmailObserverResponse["expiration"]) / 1000, tz=timezone.utc
@@ -92,7 +93,7 @@ async def handleGmailWebhook(
     asyncio.create_task(
         processMessages(
             gmailService=gmailService,
-            gmailHistoryId=newGmailHistoryId,
+            gmailHistoryId=oldGmailHistoryId,
             userEmailDetail=userEmailDetail,
             settings=settings,
         )
