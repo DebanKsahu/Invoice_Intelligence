@@ -6,7 +6,7 @@ from internal.platform.database.models.UserInDatabase import UserInDatabase
 
 
 def createAsyncEngine(settings: Settings):
-    return create_async_engine(url=settings.databaseSettings.DATABASE_URL, echo=True)
+    return create_async_engine(url=settings.databaseSettings.DATABASE_URL, echo=False)
 
 
 async def initPostgresSQL(asyncEngine: AsyncEngine):
