@@ -83,6 +83,9 @@ async def handleGmailWebhook(
     user.gmailObserverExpiry = datetime.fromtimestamp(
         timestamp=int(newGmailObserverResponse["expiration"]) / 1000, tz=timezone.utc
     )
+
+    userEmailDetail = UserEmailDetail(name=user.name, email=user.email)
+
     asyncSession.add(user)
     await asyncSession.commit()
 
@@ -90,7 +93,7 @@ async def handleGmailWebhook(
         processMessages,
         gmailService=gmailService,
         gmailHistoryId=newGmailHistoryId,
-        userEmailDetail=UserEmailDetail(name=user.name, email=user.email),
+        userEmailDetail=userEmailDetail,
         settings=settings,
     )
 
