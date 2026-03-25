@@ -20,6 +20,8 @@ This system is engineered for scalability, featuring a modular **Domain-Driven D
 | **📧 Real-time Sync** | **Pub/Sub Webhooks** trigger asynchronous background tasks for non-blocking processing, while persisting `historyId` before job execution to prevent out-of-order event duplication. |
 | **🧠 Advanced AI Pipeline** | **Multi-stage processing**: <br>1. **Extraction**: High-fidelity text extraction using **LLMWhisperer**. <br>2. **Validation**: Intelligent document classification to filter non-invoices. <br>3. **Extraction**: Structured data parsing (Vendor, Line Items, Tax) using **Google Gemini**. |
 | **📊 Smart Data Export** | Automatically generates comprehensive **Excel** reports with summaries & item breakdowns, and **replies** to the sender with the file attached. |
+| **📎 Intelligent Attachment Filtering** | Processes only invoice-like attachments using MIME and extension checks (`pdf`, `png`, `jpg`, `jpeg`, `tiff`, `webp`). |
+| **🔁 Loop Prevention** | Skips processing app-generated reply emails by subject match to avoid recursive webhook-triggered processing. |
 | **⚡ Async Performance** | Fully asynchronous **SQLAlchemy 2.0** & **SQLModel** ORM with PostgreSQL. |
 | **🏗️ Modular Design** | Clean **Domain-Driven Design (DDD)** architecture for maintainability and scale. |
 | **🧩 Service Modularization** | Gmail processing is split into focused services (`core_service`, `data_extraction_service`, `mail_service`) for easier maintenance and testing. |
@@ -127,7 +129,17 @@ Explore the interactive API docs at `http://localhost:8000/docs`.
 | :--- | :--- | :--- |
 | `GET` | `/auth/gmail/initAuth` | Initiates the Google OAuth2 flow for Gmail access. |
 | `GET` | `/auth/gmail/callback` | OAuth2 callback handler to exchange code for tokens. |
-| `POST` | `/gmail/webhook` | Receives Pub/Sub push notifications for mailbox updates. |
+| `POST` | `/gmail/webhook` | Receives Pub/Sub push notifications, persists history state, and schedules background processing. |
+
+## 🧭 Gmail Webhook Processing Flow
+
+1. Webhook payload is validated and decoded.
+2. User is resolved from DB and stale events are ignored (`incoming historyId <= stored historyId`).
+3. Latest `historyId` and observer expiry are persisted immediately.
+4. Message processing is dispatched via FastAPI background tasks.
+5. Attachments are filtered by MIME/extension and reply-generated messages are excluded.
+6. Valid invoices are extracted and consolidated into an Excel report.
+7. A reply email is sent with `Invoices.xlsx` attached.
 
 ## 🤝 Contributing
 

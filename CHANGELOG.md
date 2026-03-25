@@ -16,6 +16,20 @@ All notable changes to this project will be documented in this file.
 ### Removed
 - None.
 
+## [0.3.2] - 2026-03-25
+
+### Added
+- None.
+
+### Changed
+- None.
+
+### Fixed
+- Fixed Gmail webhook user email detail assignment in `handleGmailWebhook`.
+
+### Removed
+- None.
+
 ## [0.3.1] - 2026-03-25
 
 ### Added
@@ -70,7 +84,8 @@ All notable changes to this project will be documented in this file.
 ### Removed
 - Removed logger parameter from Gmail webhook handler entrypoint.
 
-[Unreleased]: https://github.com/DebanKsahu/Invoice_Intelligence/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/DebanKsahu/Invoice_Intelligence/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/DebanKsahu/Invoice_Intelligence/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/DebanKsahu/Invoice_Intelligence/releases/tag/v0.3.1
 [0.3.0]: https://github.com/DebanKsahu/Invoice_Intelligence/releases/tag/v0.3.0
 [0.2.0]: https://github.com/DebanKsahu/Invoice_Intelligence/releases/tag/v0.2.0
