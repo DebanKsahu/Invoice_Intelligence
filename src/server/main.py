@@ -33,7 +33,7 @@ applicationDependency = buildAppDependencies()
 
 @asynccontextmanager
 async def appLifespan(app: FastAPI):
-    logger = logging.getLogger("invoice_intelligence")
+    logger = logging.getLogger(__name__)
     logger.info("🚀 Application startup: Initializing database...")
     await initPostgresSQL(asyncEngine=applicationDependency.asyncEngine)
     logger.info("✅ Database initialization completed")

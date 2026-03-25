@@ -8,7 +8,7 @@ import logging
 
 def setupLogging() -> logging.Logger:
     # Get or create root logger
-    logger = logging.getLogger("invoice_intelligence")
+    logger = logging.getLogger()
 
     # Prevent duplicate handlers if called multiple times
     if logger.handlers:
