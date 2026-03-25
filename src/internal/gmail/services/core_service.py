@@ -89,13 +89,6 @@ async def handleGmailWebhook(
     asyncSession.add(user)
     await asyncSession.commit()
 
-    # backgroundTasks.add_task(
-    #     processMessagesSyncWrapper,
-    #     gmailService=gmailService,
-    #     gmailHistoryId=newGmailHistoryId,
-    #     userEmailDetail=userEmailDetail,
-    #     settings=settings,
-    # )
     asyncio.create_task(
         processMessages(
             gmailService=gmailService,
