@@ -6,7 +6,6 @@ from io import BytesIO
 from typing import Dict
 
 import msgspec
-from fastapi import BackgroundTasks
 from google.auth.external_account_authorized_user import Credentials
 from google.auth.transport.requests import Request as GoogleRequest
 from google.oauth2.credentials import Credentials as OAuthCredentils
@@ -39,7 +38,7 @@ def createGmailObserver(userCredentails: Credentials | OAuthCredentils, settings
 
 
 async def handleGmailWebhook(
-    requestBody: Dict, asyncSession: AsyncSession, settings: Settings, backgroundTasks: BackgroundTasks
+    requestBody: Dict, asyncSession: AsyncSession, settings: Settings
 ) -> GmailWebhookResponse:
     logger = logging.getLogger(__name__)
     message = requestBody.get("message", {})
@@ -90,12 +89,20 @@ async def handleGmailWebhook(
     asyncSession.add(user)
     await asyncSession.commit()
 
-    backgroundTasks.add_task(
-        processMessagesSyncWrapper,
-        gmailService=gmailService,
-        gmailHistoryId=newGmailHistoryId,
-        userEmailDetail=userEmailDetail,
-        settings=settings,
+    # backgroundTasks.add_task(
+    #     processMessagesSyncWrapper,
+    #     gmailService=gmailService,
+    #     gmailHistoryId=newGmailHistoryId,
+    #     userEmailDetail=userEmailDetail,
+    #     settings=settings,
+    # )
+    asyncio.create_task(
+        processMessages(
+            gmailService=gmailService,
+            gmailHistoryId=newGmailHistoryId,
+            userEmailDetail=userEmailDetail,
+            settings=settings,
+        )
     )
 
     return GmailWebhookResponse(ok=True)
@@ -115,10 +122,6 @@ def getUnprocessedMessages(gmailService, gmailHistoryId: int):
 
     logger.info(f"Found {len(messageIds)} new messages in history")
     return messageIds
-
-
-def processMessagesSyncWrapper(**kwargs):
-    asyncio.create_task(processMessages(**kwargs))
 
 
 async def processMessages(
