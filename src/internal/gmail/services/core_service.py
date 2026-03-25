@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import logging
 from datetime import datetime, timezone
@@ -90,7 +91,7 @@ async def handleGmailWebhook(
     await asyncSession.commit()
 
     backgroundTasks.add_task(
-        processMessages,
+        processMessagesSyncWrapper,
         gmailService=gmailService,
         gmailHistoryId=newGmailHistoryId,
         userEmailDetail=userEmailDetail,
@@ -114,6 +115,10 @@ def getUnprocessedMessages(gmailService, gmailHistoryId: int):
 
     logger.info(f"Found {len(messageIds)} new messages in history")
     return messageIds
+
+
+def processMessagesSyncWrapper(**kwargs):
+    asyncio.create_task(processMessages(**kwargs))
 
 
 async def processMessages(
