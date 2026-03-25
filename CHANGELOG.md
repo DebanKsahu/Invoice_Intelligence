@@ -71,6 +71,6 @@ All notable changes to this project will be documented in this file.
 - Removed logger parameter from Gmail webhook handler entrypoint.
 
 [Unreleased]: https://github.com/DebanKsahu/Invoice_Intelligence/compare/v0.3.1...HEAD
-[0.3.1]: https://github.com/DebanKsahu/Invoice_Intelligence/compare/v0.3.0...v0.3.1
+[0.3.1]: https://github.com/DebanKsahu/Invoice_Intelligence/releases/tag/v0.3.1
 [0.3.0]: https://github.com/DebanKsahu/Invoice_Intelligence/releases/tag/v0.3.0
 [0.2.0]: https://github.com/DebanKsahu/Invoice_Intelligence/releases/tag/v0.2.0
