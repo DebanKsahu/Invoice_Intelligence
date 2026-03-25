@@ -17,11 +17,12 @@ This system is engineered for scalability, featuring a modular **Domain-Driven D
 | Feature | Description |
 | :--- | :--- |
 | **🔐 Secure Auth** | OAuth2 integration with **Google** for secure Gmail access (`gmail.readonly`). |
-| **📧 Real-time Sync** | **Pub/Sub Webhooks** ensure instant notification and processing of new invoice emails. |
+| **📧 Real-time Sync** | **Pub/Sub Webhooks** trigger asynchronous background tasks for non-blocking processing, while persisting `historyId` before job execution to prevent out-of-order event duplication. |
 | **🧠 Advanced AI Pipeline** | **Multi-stage processing**: <br>1. **Extraction**: High-fidelity text extraction using **LLMWhisperer**. <br>2. **Validation**: Intelligent document classification to filter non-invoices. <br>3. **Extraction**: Structured data parsing (Vendor, Line Items, Tax) using **Google Gemini**. |
-| **📊 Smart Data Export** | Export extracted data to **Excel** with auto-generated summaries, detailed item breakdowns, and functional hyperlink navigation. |
+| **📊 Smart Data Export** | Automatically generates comprehensive **Excel** reports with summaries & item breakdowns, and **replies** to the sender with the file attached. |
 | **⚡ Async Performance** | Fully asynchronous **SQLAlchemy 2.0** & **SQLModel** ORM with PostgreSQL. |
 | **🏗️ Modular Design** | Clean **Domain-Driven Design (DDD)** architecture for maintainability and scale. |
+| **🧩 Service Modularization** | Gmail processing is split into focused services (`core_service`, `data_extraction_service`, `mail_service`) for easier maintenance and testing. |
 | **⚙️ Robust Config** | Type-safe environment management via **Pydantic Settings**. |
 | **🛡️ Middleware** | Production-ready **CORS** and **Session** management. |
 
@@ -52,7 +53,7 @@ src/
 ├── core/           # Core application logic, DI container, and utilities
 ├── internal/       # Internal domain modules (Business Logic)
 │   ├── auth/       # Authentication domain (Routes, Services, Models)
-│   ├── gmail/      # Gmail integration (Webhooks, Services, Models)
+│   ├── gmail/      # Gmail integration (Webhooks, background jobs, attachment extraction, mail replies)
 │   ├── invoice/    # Invoice processing (PDF extraction, AI analysis)
 │   ├── platform/   # Infrastructure & Platform concerns (DB, Config, Google API)
 │   └── user/       # User domain logic
@@ -67,8 +68,6 @@ src/
 - Python 3.14 or higher
 - PostgreSQL Database
 - Google Cloud Console Project (for OAuth credentials)
-
-### Installation
 
 ### 📥 Installation
 

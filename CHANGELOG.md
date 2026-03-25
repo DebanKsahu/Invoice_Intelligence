@@ -5,11 +5,39 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- None.
+
+### Changed
+- None.
+
+### Fixed
+- None.
+
+### Removed
+- None.
+
+## [0.3.1] - 2026-03-25
+
+### Added
+- None.
+
+### Changed
+- None.
+
+### Fixed
+- Fixed Gmail webhook duplicate Pub/Sub processing by persisting `historyId` before async processing.
+
+### Removed
+- None.
+
+## [0.3.0] - 2026-03-24
+
+### Added
 - Added Excel sheet generation for invoice output.
 
 ### Changed
 - Updated project version to `0.3.0`.
-- Expanded changelog tracking with initial changelog creation and v0.2.0 release notes.
+- Added and expanded changelog tracking for release documentation.
 
 ### Fixed
 - None.
@@ -42,5 +70,7 @@ All notable changes to this project will be documented in this file.
 ### Removed
 - Removed logger parameter from Gmail webhook handler entrypoint.
 
-[Unreleased]: https://github.com/DebanKsahu/Invoice_Intelligence/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/DebanKsahu/Invoice_Intelligence/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/DebanKsahu/Invoice_Intelligence/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/DebanKsahu/Invoice_Intelligence/releases/tag/v0.3.0
 [0.2.0]: https://github.com/DebanKsahu/Invoice_Intelligence/releases/tag/v0.2.0
