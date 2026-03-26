@@ -2,6 +2,7 @@ import io
 from typing import List
 
 import polars
+import xlsxwriter
 
 from internal.invoice.models.InvoiceDetail import InvoiceDetail
 from internal.invoice.models.InvoiceExcelDetail import InvoiceItemDetailSheet, InvoiceSummarySheet
@@ -27,12 +28,19 @@ def createInvoiceExcelSheet(invoiceDetails: List[InvoiceDetail]):
 
     inmemoryBuffer = io.BytesIO()
 
-    invoiceSummarySheetDataframe.write_excel(
-        workbook=inmemoryBuffer, worksheet="Invoice Summary", autofit=True, table_style="Table Style Light 9"
-    )
-    invoiceItemDetailSheetDataframe.write_excel(
-        workbook=inmemoryBuffer, worksheet="Item Detail", autofit=True, table_style="Table Style Light 10"
-    )
+    with xlsxwriter.Workbook(inmemoryBuffer) as excelWorkbook:
+        invoiceSummarySheetDataframe.write_excel(
+            workbook=excelWorkbook,
+            worksheet="Invoice Summary",
+            autofit=True,
+            table_style="Table Style Light 9",
+        )
+        invoiceItemDetailSheetDataframe.write_excel(
+            workbook=excelWorkbook,
+            worksheet="Invoice Item Detail",
+            autofit=True,
+            table_style="Table Style Light 10",
+        )
 
     inmemoryBuffer.seek(0)
     return inmemoryBuffer.getvalue()
