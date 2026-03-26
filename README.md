@@ -16,52 +16,25 @@ This system is engineered for scalability, featuring a modular **Domain-Driven D
 
 | Feature | Description |
 | :--- | :--- |
-| **🔐 Secure Auth** | OAuth2 integration with **Google** for secure Gmail access (`gmail.readonly`). |
-| **📧 Real-time Sync** | **Pub/Sub Webhooks** trigger asynchronous background tasks for non-blocking processing, while persisting `historyId` before job execution to prevent out-of-order event duplication. |
-| **🧠 Advanced AI Pipeline** | **Multi-stage processing**: <br>1. **Extraction**: High-fidelity text extraction using **LLMWhisperer**. <br>2. **Validation**: Intelligent document classification to filter non-invoices. <br>3. **Extraction**: Structured data parsing (Vendor, Line Items, Tax) using **Google Gemini**. |
-| **📊 Smart Data Export** | Automatically generates comprehensive **Excel** reports with summaries & item breakdowns, and **replies** to the sender with the file attached. |
-| **📎 Intelligent Attachment Filtering** | Processes only invoice-like attachments using MIME and extension checks (`pdf`, `png`, `jpg`, `jpeg`, `tiff`, `webp`). |
-| **🔁 Loop Prevention** | Skips processing app-generated reply emails by subject match to avoid recursive webhook-triggered processing. |
-| **⚡ Async Performance** | Fully asynchronous **SQLAlchemy 2.0** & **SQLModel** ORM with PostgreSQL. |
-| **🏗️ Modular Design** | Clean **Domain-Driven Design (DDD)** architecture for maintainability and scale. |
-| **🧩 Service Modularization** | Gmail processing is split into focused services (`core_service`, `data_extraction_service`, `mail_service`) for easier maintenance and testing. |
-| **⚙️ Robust Config** | Type-safe environment management via **Pydantic Settings**. |
-| **🛡️ Middleware** | Production-ready **CORS** and **Session** management. |
+| Secure Auth | Google OAuth2 with Gmail read-only scope (`gmail.readonly`). |
+| Real-time Sync | Pub/Sub webhook intake with non-blocking `asyncio.create_task` processing. |
+| AI Extraction Pipeline | LLMWhisperer extraction, invoice validation, and Gemini-based structured parsing. |
+| Excel Output | Generates summary + item-detail worksheets and emails `Invoices.xlsx` to users. |
+| Attachment Filtering | Accepts invoice-like files by MIME/extension (`pdf`, `png`, `jpg`, `jpeg`, `tiff`, `webp`). |
+| Loop Prevention | Skips app-generated reply emails to prevent recursive processing. |
+| Async Stack | Async FastAPI, SQLAlchemy 2.0, and SQLModel with PostgreSQL. |
+| Modular Services | Gmail logic split into `core_service`, `data_extraction_service`, and `mail_service`. |
+| Typed Config | Pydantic Settings for validated, environment-driven configuration. |
+| Structured Logging | Centralized console logging with consistent timestamped format. |
+| Middleware | CORS and session middleware enabled for API workflows. |
 
 ## 🛠️ Technology Stack
 
-**Core Infrastructure**
-- **Language:** [Python 3.14+](https://www.python.org/)
-- **Framework:** [FastAPI](https://fastapi.tiangolo.com/)
-- **Database:** PostgreSQL (Async via `psycopg` & `SQLModel`)
-- **Package Manager:** [uv](https://github.com/astral-sh/uv)
-
-**AI & Processing**
-- **LLM/AI:** [LangChain](https://www.langchain.com/), [Google Gemini](https://deepmind.google/technologies/gemini/), [LLMWhisperer](https://unstract.com/llmwhisperer/)
-- **Data Manipulation:** `polars` (fast DataFrames) and `xlsxwriter` (Excel reporting).
-- **PDF/Image:** `pymupdf` (FitZ), `pdf2image` for robust document handling.
-
-**Integrations & Tooling**
-- **Auth:** Google OAuth2 (`google-auth`)
-- **Validation:** Pydantic, Msgspec
-- **Utilities:** `uuid7` (Time-sorted UIDs)
-
-## 📂 Project Structure
-
-The project follows a Domain-Driven Design inspired structure:
-
-```
-src/
-├── core/           # Core application logic, DI container, and utilities
-├── internal/       # Internal domain modules (Business Logic)
-│   ├── auth/       # Authentication domain (Routes, Services, Models)
-│   ├── gmail/      # Gmail integration (Webhooks, background jobs, attachment extraction, mail replies)
-│   ├── invoice/    # Invoice processing (PDF extraction, AI analysis)
-│   ├── platform/   # Infrastructure & Platform concerns (DB, Config, Google API)
-│   └── user/       # User domain logic
-├── pkg/            # Shared packages and middlewares
-└── server/         # Application entry point (main.py)
-```
+| Category | Stack |
+| :--- | :--- |
+| Core Infrastructure | [Python 3.14+](https://www.python.org/), [FastAPI](https://fastapi.tiangolo.com/), PostgreSQL (Async via `psycopg` and `SQLModel`), [uv](https://github.com/astral-sh/uv) |
+| AI and Processing | [LangChain](https://www.langchain.com/), [Google Gemini](https://deepmind.google/technologies/gemini/), [LLMWhisperer](https://unstract.com/llmwhisperer/), `pymupdf`, `pdf2image`, `polars`, `xlsxwriter` |
+| Integrations and Tooling | Google OAuth2 (`google-auth`), Pydantic, Msgspec, Python `logging` via `core/LoggingConfig.py`, `uuid7` |
 
 ## ⚡ Getting Started
 
@@ -125,21 +98,21 @@ Explore the interactive API docs at `http://localhost:8000/docs`.
 
 ## 🔌 API Endpoints
 
-| Method | Endpoint | Description |
+| Method | Endpoint | Purpose |
 | :--- | :--- | :--- |
-| `GET` | `/auth/gmail/initAuth` | Initiates the Google OAuth2 flow for Gmail access. |
-| `GET` | `/auth/gmail/callback` | OAuth2 callback handler to exchange code for tokens. |
-| `POST` | `/gmail/webhook` | Receives Pub/Sub push notifications, persists history state, and schedules background processing. |
+| GET | `/auth/gmail/initAuth` | Starts Google OAuth2 flow for Gmail access. |
+| GET | `/auth/gmail/callback` | Handles OAuth2 callback and token exchange. |
+| POST | `/gmail/webhook` | Handles Pub/Sub events, persists state, and schedules async processing. |
 
 ## 🧭 Gmail Webhook Processing Flow
 
-1. Webhook payload is validated and decoded.
-2. User is resolved from DB and stale events are ignored (`incoming historyId <= stored historyId`).
-3. Latest `historyId` and observer expiry are persisted immediately.
-4. Message processing is dispatched via FastAPI background tasks.
-5. Attachments are filtered by MIME/extension and reply-generated messages are excluded.
-6. Valid invoices are extracted and consolidated into an Excel report.
-7. A reply email is sent with `Invoices.xlsx` attached.
+1. Validate and decode webhook payload.
+2. Resolve user and ignore stale events (`incoming historyId <= stored historyId`).
+3. Persist latest `historyId` and observer expiry.
+4. Dispatch async processing via `asyncio.create_task`.
+5. Filter attachments and exclude reply-generated messages.
+6. Extract invoice data and build Excel sheets (`Invoice Summary`, `Invoice Item Detail`).
+7. Send reply email with `Invoices.xlsx`.
 
 ## 🤝 Contributing
 

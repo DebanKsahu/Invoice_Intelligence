@@ -16,6 +16,23 @@ All notable changes to this project will be documented in this file.
 ### Removed
 - None.
 
+## [0.3.3] - 2026-03-26
+
+### Added
+- None.
+
+### Changed
+- Refactored Gmail webhook flow to remove `backgroundTasks` from `handleGmailWebhook` and process messages through a synchronous wrapper.
+- Updated logging to use module-based logger names for clearer source attribution.
+
+### Fixed
+- Fixed workbook handling in invoice export by appending sheets to the existing workbook instance instead of overriding it.
+- Fixed Gmail webhook `gmailHistoryId` assignment in `handleGmailWebhook`.
+- Disabled SQLAlchemy async engine echo in database setup to reduce noisy runtime output.
+
+### Removed
+- None.
+
 ## [0.3.2] - 2026-03-25
 
 ### Added
@@ -84,7 +101,8 @@ All notable changes to this project will be documented in this file.
 ### Removed
 - Removed logger parameter from Gmail webhook handler entrypoint.
 
-[Unreleased]: https://github.com/DebanKsahu/Invoice_Intelligence/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/DebanKsahu/Invoice_Intelligence/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/DebanKsahu/Invoice_Intelligence/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/DebanKsahu/Invoice_Intelligence/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/DebanKsahu/Invoice_Intelligence/releases/tag/v0.3.1
 [0.3.0]: https://github.com/DebanKsahu/Invoice_Intelligence/releases/tag/v0.3.0
